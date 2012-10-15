@@ -1,14 +1,13 @@
 package blueeyes.core.service
 
-import akka.dispatch.Future
 import akka.dispatch.Promise
 import blueeyes.bkka.AkkaDefaults
-import blueeyes.core.http.{HttpResponse, HttpRequest}
+import blueeyes.core.http.HttpRequest
 import blueeyes.util.metrics.DataSize
 import blueeyes.core.data.{AggregatedByteChunk, ByteChunk}
 
-trait HttpClientByteChunk extends HttpClient[ByteChunk] with AkkaDefaults { self =>
-  def aggregate(chunkSize: Option[DataSize]) = new HttpClient[ByteChunk] {
+trait HttpClientByteChunk extends HttpClient[ByteChunk, ByteChunk] with AkkaDefaults { self =>
+  def aggregate(chunkSize: Option[DataSize]) = new HttpClient[ByteChunk, ByteChunk] {
     val chunkSizeInBytes = chunkSize.map(_.bytes)
     def isDefinedAt(request: HttpRequest[ByteChunk]) = self.isDefinedAt(request)
 

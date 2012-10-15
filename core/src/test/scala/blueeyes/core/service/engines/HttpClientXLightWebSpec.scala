@@ -164,7 +164,7 @@ with AkkaDefaults with HttpRequestMatchers {
     "Support POST requests with large payload with several chunks" in {
       val expected = Array.fill[Byte](2048*100)('0')
       val chunk   = Chunk(expected, Some(Future(Chunk(expected))))
-      httpClient.post[ByteChunk](uri)(chunk) must whenDelivered {
+      httpClient.post[ByteChunk, ByteChunk](uri)(chunk) must whenDelivered {
         beLike {
           case HttpResponse(status, _, Some(content), _) =>
             (status.code must_== HttpStatusCodes.OK) and
@@ -220,7 +220,7 @@ with AkkaDefaults with HttpRequestMatchers {
       import BijectionsChunkByteArray._
       import BijectionsByteArray._
       val expected = "Hello, world"
-      httpClient.post(uri)(StringToByteArray(expected)) must succeedWithContent {
+      httpClient.post[Array[Byte], Array[Byte]](uri)(StringToByteArray(expected)) must succeedWithContent {
         (content: Array[Byte]) => ByteArrayToString(content) must_== expected
       }
     }
@@ -232,7 +232,7 @@ with AkkaDefaults with HttpRequestMatchers {
 
       val chunks: Chunk[String] = Chunk("foo", Some(Future[Chunk[String]](Chunk("bar"))))
 
-      val response = Await.result(httpClient.post(uri)(chunks)(bijection), duration)
+      val response = Await.result(httpClient.post[Chunk[String], String](uri)(chunks), duration)
       response.status.code must be(HttpStatusCodes.OK)
       readContent(response.content.get).map(_.mkString("")) must whenDelivered {
         be_==("foobar")

@@ -7,11 +7,11 @@ package object service {
   type AsyncHttpService[T]       = HttpService[T, Future[HttpResponse[T]]]
   type AsyncCustomHttpService[T] = CustomHttpService[T, Future[HttpResponse[T]]]
 
-  type HttpClientHandler[T]      = PartialFunction[HttpRequest[T], Future[HttpResponse[T]]]
+  type HttpClientHandler[A, B] = PartialFunction[HttpRequest[A], Future[HttpResponse[B]]]
 
   type HttpServiceHandler[T, S]  = HttpRequest[T] => S
 
-  type HttpClientTransformer[T, S] = HttpClient[T] => Future[S]
+//  type HttpClientTransformer[T, S] = HttpClient[T] => Future[S]
 
   type ServiceDescriptorFactory[T, S] = ServiceContext => ServiceDescriptor[T, S]
 

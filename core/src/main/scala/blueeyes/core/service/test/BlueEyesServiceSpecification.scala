@@ -70,14 +70,14 @@ class BlueEyesServiceSpecification extends Specification with blueeyes.concurren
     setProp(Environment.MockSwitch, mockSwitch)
   }
 
-  def service: HttpClient[ByteChunk] = new SpecClient()
+  def service: HttpClient[ByteChunk, ByteChunk] = new SpecClient()
 
   private def startServer = Await.result(httpServer.start, new DurationLong(startTimeOut) millis)
   private def stopServer  = Await.result(httpServer.stop,  new DurationLong(stopTimeOut) millis)
 
   lazy val rootConfig = Configuration.parse(configuration, BlockFormat)
 
-  private class SpecClient extends HttpClient[ByteChunk]{
+  private class SpecClient extends HttpClient[ByteChunk, ByteChunk]{
     def apply(request: HttpRequest[ByteChunk]) = {
       def convertErrorToResponse(th: Throwable): HttpResponse[ByteChunk] = th match {
         case e: HttpException => HttpResponse[ByteChunk](HttpStatus(e.failure, e.reason))

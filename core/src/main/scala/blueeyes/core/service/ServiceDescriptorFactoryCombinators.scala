@@ -237,7 +237,7 @@ trait ServiceDescriptorFactoryCombinators extends HttpRequestHandlerCombinators 
     }
   }
 
-  type ServiceLocator[T] = (String, ServiceVersion) => HttpClient[T]
+  type ServiceLocator[T] = (String, ServiceVersion) => HttpClient[T, T]
 
   /**
    * Augments the service with a locator, which is capable of creating HTTP
@@ -253,7 +253,7 @@ trait ServiceDescriptorFactoryCombinators extends HttpRequestHandlerCombinators 
    * }
    * }}}
    */
-  def serviceLocator[T, S](f: ServiceLocator[T] => ServiceDescriptorFactory[T, S])(implicit httpClient: HttpClient[T]): ServiceDescriptorFactory[T, S] = {
+  def serviceLocator[T, S](f: ServiceLocator[T] => ServiceDescriptorFactory[T, S])(implicit httpClient: HttpClient[T, T]): ServiceDescriptorFactory[T, S] = {
     implicit def hack[X1, X2](f: Future[X1]): Future[X2] = f.asInstanceOf[Future[X2]]
 
     (context: ServiceContext) => {

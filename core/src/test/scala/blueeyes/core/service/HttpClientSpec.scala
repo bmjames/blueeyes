@@ -13,7 +13,7 @@ class HttpClientSpec extends Specification with BijectionsByteArray with blueeye
 
   private val initialRequest = HttpRequest[String](HttpMethods.GET, "/baz")
 
-  private val mockClient = new HttpClient[String]{
+  private val mockClient = new HttpClient[String, String] {
     var request: Option[HttpRequest[String]] = None
 
     def apply(r: HttpRequest[String]) = {
@@ -51,7 +51,7 @@ class HttpClientSpec extends Specification with BijectionsByteArray with blueeye
   "sets remote host header request" in{ makeTest(initialRequest.copy(headers = Map[String, String]("X-Forwarded-For" -> InetAddress.getLocalHost.getHostAddress(), "X-Cluster-Client-Ip" -> InetAddress.getLocalHost.getHostAddress()),
       remoteHost = Some(InetAddress.getLocalHost))) {client => client.remoteHost(InetAddress.getLocalHost)} }
 
-  private def makeTest(expectation: HttpRequest[String], uri: URI = initialRequest.uri, method: HttpMethod = initialRequest.method)(builder: (HttpClient[String]) => HttpClient[String]) = {
+  private def makeTest(expectation: HttpRequest[String], uri: URI = initialRequest.uri, method: HttpMethod = initialRequest.method)(builder: HttpClient[String, String] => HttpClient[String, String]) = {
     builder(mockClient).custom(method, uri.toString)
 
     mockClient.request.get mustEqual(expectation)

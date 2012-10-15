@@ -51,7 +51,7 @@ class HttpServiceDescriptorFactoryCombinatorsSpec extends BlueEyesServiceSpecifi
     }
   """.format(System.getProperty("java.io.tmpdir") + File.separator + logFilePrefix + ".log")
 
-  implicit val httpClient: HttpClient[ByteChunk] = new HttpClient[ByteChunk] {
+  implicit val httpClient: HttpClient[ByteChunk, ByteChunk] = new HttpClient[ByteChunk, ByteChunk] {
     def apply(r: HttpRequest[ByteChunk]): Future[HttpResponse[ByteChunk]] = {
       Future(HttpResponse[ByteChunk](content = Some(r.uri.path match {
         case Some("/foo/v1/proxy")  => 
@@ -103,7 +103,7 @@ class HttpServiceDescriptorFactoryCombinatorsSpec extends BlueEyesServiceSpecifi
 }
 
 trait HealthMonitorService extends BlueEyesServiceBuilder with ServiceDescriptorFactoryCombinators with BijectionsChunkJson{
-  implicit def httpClient: HttpClient[ByteChunk]
+  implicit def httpClient: HttpClient[ByteChunk, ByteChunk]
 
   val emailService = service ("email", "1.2.3") {
     requestLogging(Timeout(60000)) {
