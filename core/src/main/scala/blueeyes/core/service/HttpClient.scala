@@ -6,85 +6,91 @@ import blueeyes.core.data._
 import java.net.InetAddress
 import org.jboss.netty.handler.codec.http.CookieEncoder
 
-trait HttpClient[A] extends HttpClientHandler[A] { self =>
+trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
 
-  def get[B](path: String)(implicit transcoder: Bijection[B, A]) = method[B](HttpMethods.GET, path)
+  def get[D](path: String)(implicit decoder: B <~> D) = method[A, D](HttpMethods.GET, path)
 
-  def post[B](path: String)(content: B)(implicit transcoder: Bijection[B, A]) = method[B](HttpMethods.POST, path, Some(transcoder(content)))
+  def post[C, D](path: String)(content: C)(implicit encoder: C <~> A, decoder: B <~> D) =
+    method[C, D](HttpMethods.POST, path, Some(encoder.apply(content)))
 
-  def put[B](path: String)(content: B)(implicit transcoder: Bijection[B, A]) = method[B](HttpMethods.PUT, path, Some(transcoder(content)))
+  def put[C, D](path: String)(content: C)(implicit encoder: C <~> A, decoder: B <~> D) =
+    method[B, D](HttpMethods.PUT, path, Some(encoder(content)))
 
-  def delete[B](path: String)(implicit transcoder: Bijection[B, A]) = method[B](HttpMethods.DELETE, path)
+  def delete[D](path: String)(implicit decoder: B <~> D) = method[A, D](HttpMethods.DELETE, path)
 
-  def options[B](path: String)(implicit transcoder: Bijection[B, A]) = method[B](HttpMethods.OPTIONS, path)
+  def options[D](path: String)(implicit decoder: B <~> D) = method[A, D](HttpMethods.OPTIONS, path)
 
-  def head[B](path: String)(implicit transcoder: Bijection[B, A]) = method[B](HttpMethods.HEAD, path)
+  def head[D](path: String)(implicit decoder: B <~> D) = method[A, D](HttpMethods.HEAD, path)
 
-  def connect[B](path: String)(implicit transcoder: Bijection[B, A]) = method[B](HttpMethods.CONNECT, path)
+  def connect[D](path: String)(implicit decoder: B <~> D) = method[A, D](HttpMethods.CONNECT, path)
 
-  def trace[B](path: String)(implicit transcoder: Bijection[B, A]) = method[B](HttpMethods.TRACE, path)
+  def trace[D](path: String)(implicit decoder: B <~> D) = method[A, D](HttpMethods.TRACE, path)
 
-  def custom[B](custom: HttpMethod, path: String)(implicit transcoder: Bijection[B, A]) = method[B](custom, path)
+  def custom[D](custom: HttpMethod, path: String)(implicit decoder: B <~> D) = method[A, D](custom, path)
 
-  def protocol(protocol: String) = buildClient { request => request.withUriChanges(scheme = Some(protocol)) }
+  def protocol(protocol: String): HttpClient[A, B] =
+    buildClient { request => request.withUriChanges(scheme = Some(protocol)) }
 
-  def secure = protocol("https")
+  def secure: HttpClient[A, B] = protocol("https")
 
-  def host(host: String) = buildClient { request => request.withUriChanges(host = Some(host)) }
+  def host(host: String): HttpClient[A, B] = buildClient { request => request.withUriChanges(host = Some(host)) }
 
-  def port(port: Int) = buildClient { request => request.withUriChanges(port = Some(port)) }
+  def port(port: Int): HttpClient[A, B] = buildClient { request => request.withUriChanges(port = Some(port)) }
 
-  def path(path: String) = buildClient { request =>
+  def path(path: String): HttpClient[A, B] = buildClient { request =>
     val originalURI = request.uri
-    val uri         = URI(originalURI.scheme, originalURI.userInfo, originalURI.host, originalURI.port, originalURI.path.map(path + _).orElse(Some(path)), originalURI.query, originalURI.fragment)
+    val uri = URI(originalURI.scheme, originalURI.userInfo, originalURI.host, originalURI.port, originalURI.path.map(path + _).orElse(Some(path)), originalURI.query, originalURI.fragment)
     HttpRequest(request.method, URI(uri.toString), request.parameters, request.headers, request.content, request.remoteHost, request.version)
   }
 
-  def parameters(parameters: (Symbol, String)*) = buildClient { request => request.copy(parameters = Map[Symbol, String](parameters: _*))}
+  def parameters(parameters: (Symbol, String)*): HttpClient[A, B] =
+    buildClient { request => request.copy(parameters = Map[Symbol, String](parameters: _*)) }
 
-  def content[B](content: B)(implicit transcoder: Bijection[B, A]) = buildClient { request => request.copy(content = Some(transcoder.apply(content)))}
+  def content[C](content: C)(implicit encoder: C <~> A): HttpClient[C, B] =
+    buildClient { request => request.copy(content = Some(encoder(content))) }
 
-  def cookies(cookies: (String, String)*) = buildClient { request =>
+  def cookies(cookies: (String, String)*): HttpClient[A, B] = buildClient { request =>
     val cookieEncoder = new CookieEncoder(false)
     cookies.foreach(cookie => cookieEncoder.addCookie(cookie._1, cookie._2))
 
     request.copy(headers = request.headers + Tuple2("Cookie", cookieEncoder.encode()))
   }
 
-  def remoteHost(host: InetAddress) = buildClient { request => HttpRequest(request.method, request.uri, request.parameters, request.headers + Tuple2("X-Forwarded-For", host.getHostAddress) + Tuple2("X-Cluster-Client-Ip", host.getHostAddress) , request.content, Some(host), request.version)}
+  def remoteHost(host: InetAddress): HttpClient[A, B] = buildClient { request =>
+    HttpRequest(request.method, request.uri, request.parameters, request.headers + Tuple2("X-Forwarded-For", host.getHostAddress) + Tuple2("X-Cluster-Client-Ip", host.getHostAddress), request.content, Some(host), request.version)
+  }
 
-  def header(name: String, value: String): HttpClient[A] = header((name, value))
+  def header(name: String, value: String): HttpClient[A, B] = header((name, value))
 
-  def header(h: HttpHeader): HttpClient[A] = buildClient {
+  def header(h: HttpHeader): HttpClient[A, B] = buildClient {
     request => request.copy(headers = request.headers + h)
   }
 
-  def headers(h: Iterable[HttpHeader]): HttpClient[A] = buildClient { request => request.copy(headers = request.headers ++ h) }
+  def headers(h: Iterable[HttpHeader]): HttpClient[A, B] =
+    buildClient { request => request.copy(headers = request.headers ++ h) }
 
-  def version(version: HttpVersion) = buildClient { request => HttpRequest(request.method, request.uri, request.parameters, request.headers, request.content, request.remoteHost, version)}
+  def version(version: HttpVersion): HttpClient[A, B] = buildClient { request =>
+    HttpRequest(request.method, request.uri, request.parameters, request.headers, request.content, request.remoteHost, version)
+  }
 
-  def query(name: String, value: String): HttpClient[A] = queries((name, value))
+  def query(name: String, value: String): HttpClient[A, B] = queries((name, value))
 
-  def queries(qs: (String, String)*): HttpClient[A] = buildClient { request => addQueries(request)(qs) }
+  def queries(qs: (String, String)*): HttpClient[A, B] = buildClient { request => addQueries(request)(qs) }
 
-  def contentType[B](mimeType: MimeType)(implicit transcoder: Bijection[B, A]) = new HttpClient[B] {
-    def isDefinedAt(request: HttpRequest[B]): Boolean = self.isDefinedAt(request.copy(content = request.content.map(transcoder.apply(_))))
+  def contentType[C](mimeType: MimeType)(implicit encoder: C <~> A): HttpClient[C, B] = new HttpClient[C, B] {
+    def isDefinedAt(request: HttpRequest[C]) =
+      self.isDefinedAt(request.copy(content = request.content.map(encoder.apply)))
 
-    def apply(request: HttpRequest[B]): Future[HttpResponse[B]] = self.apply {
-      request.copy(content = request.content.map(transcoder.apply(_)), headers = request.headers + Tuple2("Content-Type", mimeType.value))
-    } map {response =>
-      val newC = response.content.map(transcoder.unapply(_))
-      response.copy(content = newC)
+    def apply(request: HttpRequest[C]): Future[HttpResponse[B]] = self.apply {
+      request.copy(content = request.content.map(encoder.apply), headers = request.headers + Tuple2("Content-Type", mimeType.value))
     }
   }
 
-  def translate[B](implicit transcoder: Bijection[B, A]) = new HttpClient[B] {
-    def isDefinedAt(request: HttpRequest[B]): Boolean = self.isDefinedAt(request.copy(content = request.content.map(transcoder.apply(_))))
+  def translate[D](implicit decoder: B <~> D): HttpClient[A, D] = new HttpClient[A, D] {
+    def isDefinedAt(request: HttpRequest[A]) = self.isDefinedAt(request)
 
-    def apply(request: HttpRequest[B]): Future[HttpResponse[B]] = self.apply {
-      request.copy(content = request.content.map(transcoder.apply(_)))
-    } map {response =>
-      val newC = response.content.map(transcoder.unapply(_))
+    def apply(request: HttpRequest[A]): Future[HttpResponse[D]] = self.apply(request) map { response =>
+      val newC = response.content.map(decoder.apply)
       response.copy(content = newC)
     }
   }
@@ -106,30 +112,25 @@ trait HttpClient[A] extends HttpClientHandler[A] { self =>
     HttpRequest(request.method, URI(newUrl), request.parameters, request.headers, request.content, request.remoteHost, request.version)
   }
 
-  private def method[B](method: HttpMethod, path: String, content: Option[A] = None)(implicit transcoder: Bijection[B, A]): Future[HttpResponse[B]] =
-    self.apply(HttpRequest(method, path,  Map(),  Map(), content)).map{response => {
-      response.copy(content = response.content.map(transcoder.unapply(_)))
-    }}
-
-  private def buildClient(copy: (HttpRequest[A]) => HttpRequest[A]) = new HttpClient[A] {
-    def isDefinedAt(request: HttpRequest[A]): Boolean = self.isDefinedAt(request)
-
-    def apply(request: HttpRequest[A]): Future[HttpResponse[A]] = self.apply {
-      copy(request)
+  private def method[C, D](method: HttpMethod, path: String, content: Option[A] = None)(implicit decoder: B <~> D): Future[HttpResponse[D]] =
+    self.apply(HttpRequest(method, path,  Map(),  Map(), content)) map { response =>
+      response.copy(content = response.content map decoder.apply)
     }
+
+  private def buildClient[C](copy: HttpRequest[C] => HttpRequest[A]) = new HttpClient[C, B] {
+    def isDefinedAt(request: HttpRequest[C]) = self.isDefinedAt(copy(request))
+    def apply(request: HttpRequest[C]) = self.apply(copy(request))
   }
 }
 
 object HttpClient extends blueeyes.bkka.AkkaDefaults {
-  implicit def requestHandlerToHttpClient[A](h: HttpClientHandler[A]): HttpClient[A] = new HttpClient[A] {
+  implicit def requestHandlerToHttpClient[A, B](h: HttpClientHandler[A, B]): HttpClient[A, B] = new HttpClient[A, B] {
     def isDefinedAt(r: HttpRequest[A]): Boolean = h.isDefinedAt(r)
-
-    def apply(r: HttpRequest[A]): Future[HttpResponse[A]] = h.apply(r)
+    def apply(r: HttpRequest[A]): Future[HttpResponse[B]] = h.apply(r)
   }
 
-  class EchoClient[T](f: HttpRequest[T] => Option[T]) extends HttpClient[T] {
-    override def apply(r: HttpRequest[T]) = Future(HttpResponse[T](content = f(r)))
-
-    override def isDefinedAt(x: HttpRequest[T]) = true
+  class EchoClient[A, B](f: HttpRequest[A] => Option[B]) extends HttpClient[A, B] {
+    def apply(r: HttpRequest[A]) = Future(HttpResponse[B](content = f(r)))
+    def isDefinedAt(x: HttpRequest[A]) = true
   }
 }

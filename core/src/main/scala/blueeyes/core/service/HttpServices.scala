@@ -416,7 +416,7 @@ object JsonpService extends AkkaDefaults {
 }
 
 
-case class ForwardingService[T, U](f: HttpRequest[T] => Option[HttpRequest[U]], httpClient: HttpClient[U], delegate: HttpService[T, HttpResponse[T]]) 
+case class ForwardingService[T, U](f: HttpRequest[T] => Option[HttpRequest[U]], httpClient: HttpClient[U, U], delegate: HttpService[T, HttpResponse[T]])
 extends DelegatingService[T, HttpResponse[T], T, HttpResponse[T]] with AkkaDefaults {
   def service = { r: HttpRequest[T] =>
     Future(f(r).foreach(httpClient))

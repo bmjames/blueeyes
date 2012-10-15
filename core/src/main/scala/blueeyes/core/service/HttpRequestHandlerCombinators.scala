@@ -273,7 +273,7 @@ trait HttpRequestHandlerCombinators {
 
   def xml2[T, E1](h: HttpService[Future[NodeSeq], E1 => Future[HttpResponse[NodeSeq]]])(implicit b1: Bijection[T, Future[NodeSeq]], b2: Bijection[NodeSeq, T]): HttpService[T, E1 => Future[HttpResponse[T]]] = contentType2(MimeTypes.text/MimeTypes.xml) { h }
 
-  def forwarding[T, U](f: HttpRequest[T] => Option[HttpRequest[U]], httpClient: HttpClient[U]) = (h: HttpService[T, HttpResponse[T]]) => new ForwardingService[T, U](f, httpClient, h)
+  def forwarding[T, U](f: HttpRequest[T] => Option[HttpRequest[U]], httpClient: HttpClient[U, U]) = (h: HttpService[T, HttpResponse[T]]) => new ForwardingService[T, U](f, httpClient, h)
 
   def metadata[T, S](metadata: Metadata*)(h: HttpService[T, Future[HttpResponse[S]]]) = MetadataService(Some(AndMetadata(metadata: _*)), h)
 
