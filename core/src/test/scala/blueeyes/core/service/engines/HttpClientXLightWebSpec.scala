@@ -225,14 +225,15 @@ with AkkaDefaults with HttpRequestMatchers {
       }
     }
 
-    "Support POST requests with body several chunks and transcoding" in {
+    "Support POST requests with several body chunks and transcoding" in {
       import BijectionsChunkByteArray._
       import BijectionsByteArray._
-      implicit val bijection = chunksToChunksArrayByte[String]
+      implicit val encoder = chunksToChunksArrayByte[String]
+      implicit val decoder = encoder.inverse
 
       val chunks: Chunk[String] = Chunk("foo", Some(Future[Chunk[String]](Chunk("bar"))))
 
-      val response = Await.result(httpClient.post[Chunk[String], String](uri)(chunks), duration)
+      val response = Await.result(httpClient.post[Chunk[String], Chunk[String]](uri)(chunks), duration)
       response.status.code must be(HttpStatusCodes.OK)
       readContent(response.content.get).map(_.mkString("")) must whenDelivered {
         be_==("foobar")
