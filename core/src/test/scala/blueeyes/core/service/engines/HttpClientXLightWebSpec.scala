@@ -105,32 +105,32 @@ with AkkaDefaults with HttpRequestMatchers {
     }
 
     "Support POST requests with query params" in {
-      httpClient.post(uri + "?param1=a&param2=b")("") must succeedWithContent {
+      httpClient.translate[String].post(uri + "?param1=a&param2=b")("") must succeedWithContent {
         be_==/("param1=a&param2=b")
       }
     }
 
     "Support POST requests with request params" in {
-      httpClient.parameters('param1 -> "a", 'param2 -> "b").post(uri)("") must succeedWithContent {
+      httpClient.translate[String].parameters('param1 -> "a", 'param2 -> "b").post(uri)("") must succeedWithContent {
         be_==/("param1=a&param2=b")
       }
     }
 
     "Support POST requests with body" in {
       val expected = "Hello, world"
-      httpClient.post(uri)(expected) must succeedWithContent (be_==(expected))
+      httpClient.translate[String].post(uri)(expected) must succeedWithContent (be_==(expected))
     }
 
     "Support POST requests with body and request params" in {
       val expected = "Hello, world"
-      httpClient.parameters('param1 -> "a", 'param2 -> "b").post(uri)(expected) must succeedWithContent {
+      httpClient.translate[String].parameters('param1 -> "a", 'param2 -> "b").post(uri)(expected) must succeedWithContent {
         be_==/("param1=a&param2=b" + expected)
       }
     }
 
     "Support PUT requests with body" in {
       val expected = "Hello, world"
-      httpClient.header(`Content-Length`(100)).put(uri)(expected) must succeedWithContent {
+      httpClient.translate[String].header(`Content-Length`(100)).put(uri)(expected) must succeedWithContent {
         be_==/(expected)
       }
     }
@@ -154,14 +154,14 @@ with AkkaDefaults with HttpRequestMatchers {
 
     "Support POST requests with large payload" in {
       val expected = Array.fill(2048*1000)(0).toList.mkString("")
-      httpClient.post(uri)(expected) must succeedWithContent {
+      httpClient.translate[String].post(uri)(expected) must succeedWithContent {
         be_==(expected)
       }
     }
     "Support POST requests with large payload with several chunks" in {
       val expected = Array.fill[Byte](2048*100)('0')
       val chunk   = Chunk(expected, Some(Future(Chunk(expected))))
-      httpClient.post[ByteChunk, ByteChunk](uri)(chunk) must whenDelivered {
+      httpClient.post(uri)(chunk) must whenDelivered {
         beLike {
           case HttpResponse(status, _, Some(content), _) =>
             (status.code must_== HttpStatusCodes.OK) and
@@ -217,7 +217,7 @@ with AkkaDefaults with HttpRequestMatchers {
       import BijectionsChunkByteArray._
       import BijectionsByteArray._
       val expected = "Hello, world"
-      httpClient.post[Array[Byte], Array[Byte]](uri)(StringToByteArray(expected)) must succeedWithContent {
+      httpClient.translate[Array[Byte]].post[Array[Byte]](uri)(StringToByteArray(expected)) must succeedWithContent {
         (content: Array[Byte]) => ByteArrayToString(content) must_== expected
       }
     }
@@ -230,7 +230,8 @@ with AkkaDefaults with HttpRequestMatchers {
 
       val chunks: Chunk[String] = Chunk("foo", Some(Future[Chunk[String]](Chunk("bar"))))
 
-      val response = Await.result(httpClient.post[Chunk[String], Chunk[String]](uri)(chunks), duration)
+      val futureResponse = httpClient.translate[Chunk[String]].post[Chunk[String]](uri)(chunks)
+      val response = Await.result(futureResponse, duration)
       response.status.code must be(HttpStatusCodes.OK)
       readContent(response.content.get).map(_.mkString("")) must whenDelivered {
         be_==("foobar")
@@ -239,7 +240,7 @@ with AkkaDefaults with HttpRequestMatchers {
 
     "Support POST requests with encoded URL should be preserved" in {
       val content = "Hello, world"
-      httpClient.post(uri + "?headers=true&plckForumId=Cat:Wedding%20BoardsForum:238")(content) must whenDelivered {
+      httpClient.translate[String].post[String](uri + "?headers=true&plckForumId=Cat:Wedding%20BoardsForum:238")(content) must whenDelivered {
         beLike {
           case HttpResponse(status, _, Some(content), _) =>
             (status.code must_== HttpStatusCodes.OK) and
@@ -252,7 +253,7 @@ with AkkaDefaults with HttpRequestMatchers {
       import BijectionsChunkByteArray._
       import BijectionsByteArray._
       val expected = "Hello, world"
-      httpClient.post[Array[Byte], String](uri)(StringToByteArray(expected)) must succeedWithContent {
+      httpClient.translate[String].post[Array[Byte]](uri)(StringToByteArray(expected)) must succeedWithContent {
         (content: String) => content must_== expected
       }
     }
