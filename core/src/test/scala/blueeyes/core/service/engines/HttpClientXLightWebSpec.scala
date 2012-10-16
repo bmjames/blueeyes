@@ -9,7 +9,6 @@ import blueeyes.core.http.MimeTypes._
 import blueeyes.core.http.HttpStatusCodes._
 import netty.NettyEngine
 import org.specs2.mutable.Specification
-import org.specs2.time.TimeConversions._
 
 import akka.dispatch.Future
 import akka.dispatch.Promise
@@ -17,8 +16,6 @@ import akka.dispatch.Await
 import blueeyes.bkka.AkkaDefaults
 
 import collection.mutable.ArrayBuilder.ofByte
-import blueeyes.json.JsonAST._
-import blueeyes.json.Printer._
 import org.specs2.specification.{Step, Fragments}
 
 import org.streum.configrity.Configuration
@@ -173,7 +170,7 @@ with AkkaDefaults with HttpRequestMatchers {
       }
     }
 
-   "Support HEAD requests" in {
+    "Support HEAD requests" in {
       httpClient.head(uri) must whenDelivered {
         beLike {
           case HttpResponse(status, _, _, _) =>
@@ -182,7 +179,7 @@ with AkkaDefaults with HttpRequestMatchers {
       }
     }
 
-   "Support response headers" in {
+    "Support response headers" in {
       httpClient.get(uri) must whenDelivered {
         beLike {
           case HttpResponse(status, headers, _, _) =>
@@ -250,6 +247,15 @@ with AkkaDefaults with HttpRequestMatchers {
           }
       }
     }
+
+    "Support POST requests with with differing request and response types" in {
+      import BijectionsChunkByteArray._
+      import BijectionsByteArray._
+      val expected = "Hello, world"
+      httpClient.post[Array[Byte], String](uri)(StringToByteArray(expected)) must succeedWithContent {
+        (content: String) => content must_== expected
+      }
+    }
   }
 }
 
@@ -269,7 +275,7 @@ trait ContentReader extends AkkaDefaults {
   def readContent[T](chunk: Chunk[T], chunks: List[T], promise: Promise[List[T]]) {
     val newChunks = chunks ::: List(chunk.data)
 
-    chunk.next match{
+    chunk.next match {
       case Some(x) => x.foreach(nextChunk => readContent(nextChunk, newChunks, promise))
       case None => promise.success(newChunks)
     }
@@ -315,7 +321,7 @@ trait EchoService extends BlueEyesServiceBuilder with BijectionsChunkString with
   private def readContent(chunk: ByteChunk, buffer: ofByte, promise: Promise[String]) {
     buffer ++= chunk.data
 
-    chunk.next match{
+    chunk.next match {
       case Some(x) => x.foreach(nextChunk => readContent(nextChunk, buffer, promise))
       case None => promise.success(new String(buffer.result, "UTF-8"))
     }
