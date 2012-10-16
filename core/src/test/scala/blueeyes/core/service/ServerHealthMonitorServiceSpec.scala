@@ -12,7 +12,7 @@ class ServerHealthMonitorServiceSpec extends BlueEyesServiceSpecification with S
 
    "Server Health Monitor Service" should{
     "get server health" in {
-      service.get[JValue]("/blueeyes/server/health") must succeedWithContent {
+      service.decode[JValue].get("/blueeyes/server/health") must succeedWithContent {
         (content: JValue) => {
           (content \ "runtime" must_!=(JNothing)) and
           (content \ "memory" must_!=(JNothing)) and

@@ -8,86 +8,79 @@ import org.jboss.netty.handler.codec.http.CookieEncoder
 
 trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
 
-  def get[C](path: String)(implicit decoder: B <~ C) = translate[C].method(HttpMethods.GET, path)
+  def get(path: String) = method(HttpMethods.GET, path)
 
-  def post[C](path: String)(content: C)(implicit encoder: C => A) =
-    method(HttpMethods.POST, path, Some(encoder(content)))
+  def post(path: String)(content: A) = method(HttpMethods.POST, path, Some(content))
 
-  def put[C](path: String)(content: C)(implicit encoder: C => A) =
-    method(HttpMethods.PUT, path, Some(encoder(content)))
+  def put(path: String)(content: A) = method(HttpMethods.PUT, path, Some(content))
 
-  def delete[C](path: String)(implicit decoder: B <~ C) = method(HttpMethods.DELETE, path)
+  def delete(path: String) = method(HttpMethods.DELETE, path)
 
-  def options[C](path: String)(implicit decoder: B <~ C) = method(HttpMethods.OPTIONS, path)
+  def options(path: String) = method(HttpMethods.OPTIONS, path)
 
-  def head[C](path: String)(implicit decoder: B <~ C) = method(HttpMethods.HEAD, path)
+  def head(path: String) = method(HttpMethods.HEAD, path)
 
-  def connect[C](path: String)(implicit decoder: B <~ C) = method(HttpMethods.CONNECT, path)
+  def connect(path: String) = method(HttpMethods.CONNECT, path)
 
-  def trace[C](path: String)(implicit decoder: B <~ C) = method(HttpMethods.TRACE, path)
+  def trace(path: String) = method(HttpMethods.TRACE, path)
 
-  def custom[C](custom: HttpMethod, path: String)(implicit decoder: B <~ C) = method(custom, path)
+  def custom(custom: HttpMethod, path: String) = method(custom, path)
 
   def protocol(protocol: String): HttpClient[A, B] =
-    buildClient { request => request.withUriChanges(scheme = Some(protocol)) }
+    transformRequest { request => request.withUriChanges(scheme = Some(protocol)) }
 
   def secure: HttpClient[A, B] = protocol("https")
 
-  def host(host: String): HttpClient[A, B] = buildClient { request => request.withUriChanges(host = Some(host)) }
+  def host(host: String): HttpClient[A, B] = transformRequest { request => request.withUriChanges(host = Some(host)) }
 
-  def port(port: Int): HttpClient[A, B] = buildClient { request => request.withUriChanges(port = Some(port)) }
+  def port(port: Int): HttpClient[A, B] = transformRequest { request => request.withUriChanges(port = Some(port)) }
 
-  def path(path: String): HttpClient[A, B] = buildClient { request =>
+  def path(path: String): HttpClient[A, B] = transformRequest { request =>
     val originalURI = request.uri
     val uri = URI(originalURI.scheme, originalURI.userInfo, originalURI.host, originalURI.port, originalURI.path.map(path + _).orElse(Some(path)), originalURI.query, originalURI.fragment)
     HttpRequest(request.method, URI(uri.toString), request.parameters, request.headers, request.content, request.remoteHost, request.version)
   }
 
   def parameters(parameters: (Symbol, String)*): HttpClient[A, B] =
-    buildClient { request => request.copy(parameters = Map[Symbol, String](parameters: _*)) }
+    transformRequest { request => request.copy(parameters = Map[Symbol, String](parameters: _*)) }
 
   def content[C](content: C)(implicit encoder: C => A): HttpClient[C, B] =
-    buildClient { request => request.copy(content = Some(encoder(content))) }
+    transformRequest { request => request.copy(content = Some(encoder(content))) }
 
-  def cookies(cookies: (String, String)*): HttpClient[A, B] = buildClient { request =>
+  def cookies(cookies: (String, String)*): HttpClient[A, B] = transformRequest { request =>
     val cookieEncoder = new CookieEncoder(false)
     cookies.foreach(cookie => cookieEncoder.addCookie(cookie._1, cookie._2))
-
     request.copy(headers = request.headers + Tuple2("Cookie", cookieEncoder.encode()))
   }
 
-  def remoteHost(host: InetAddress): HttpClient[A, B] = buildClient { request =>
+  def remoteHost(host: InetAddress): HttpClient[A, B] = transformRequest { request =>
     HttpRequest(request.method, request.uri, request.parameters, request.headers + Tuple2("X-Forwarded-For", host.getHostAddress) + Tuple2("X-Cluster-Client-Ip", host.getHostAddress), request.content, Some(host), request.version)
   }
 
   def header(name: String, value: String): HttpClient[A, B] = header((name, value))
 
-  def header(h: HttpHeader): HttpClient[A, B] = buildClient {
-    request => request.copy(headers = request.headers + h)
-  }
+  def header(h: HttpHeader): HttpClient[A, B] =
+    transformRequest { request => request.copy(headers = request.headers + h) }
 
   def headers(h: Iterable[HttpHeader]): HttpClient[A, B] =
-    buildClient { request => request.copy(headers = request.headers ++ h) }
+    transformRequest { request => request.copy(headers = request.headers ++ h) }
 
-  def version(version: HttpVersion): HttpClient[A, B] = buildClient { request =>
+  def version(version: HttpVersion): HttpClient[A, B] = transformRequest { request =>
     HttpRequest(request.method, request.uri, request.parameters, request.headers, request.content, request.remoteHost, version)
   }
 
   def query(name: String, value: String): HttpClient[A, B] = queries((name, value))
 
-  def queries(qs: (String, String)*): HttpClient[A, B] = buildClient { request => addQueries(request)(qs) }
+  def queries(qs: (String, String)*): HttpClient[A, B] = transformRequest { request => addQueries(request)(qs) }
 
   def contentType(mimeType: MimeType): HttpClient[A, B] =
-    buildClient { request => request.copy(headers = request.headers + Tuple2("Content-Type", mimeType.value)) }
+    transformRequest { request => request.copy(headers = request.headers + Tuple2("Content-Type", mimeType.value)) }
 
-  def translate[C](implicit decoder: B <~ C): HttpClient[A, C] = new HttpClient[A, C] {
-    def isDefinedAt(request: HttpRequest[A]) = self.isDefinedAt(request)
+  def encode[C](implicit encoder: C => A): HttpClient[C, B] =
+    transformRequest { request => request.copy(content = request.content map encoder)}
 
-    def apply(request: HttpRequest[A]): Future[HttpResponse[C]] = self.apply(request) map { response =>
-      val newC = response.content.map(decoder.unapply)
-      response.copy(content = newC)
-    }
-  }
+  def decode[C](implicit decoder: B <~ C): HttpClient[A, C] =
+    transformResponse { response => response.copy(content = response.content map decoder.unapply) }
 
   private def addQueries(request: HttpRequest[A])(queries: Iterable[(String, String)]): HttpRequest[A] = {
     import java.net.URLEncoder
@@ -109,9 +102,14 @@ trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
   private def method(method: HttpMethod, path: String, content: Option[A] = None): Future[HttpResponse[B]] =
     self.apply(HttpRequest(method, path,  Map(),  Map(), content))
 
-  private def buildClient[C](copy: HttpRequest[C] => HttpRequest[A]) = new HttpClient[C, B] {
-    def isDefinedAt(request: HttpRequest[C]) = self.isDefinedAt(copy(request))
-    def apply(request: HttpRequest[C]) = self.apply(copy(request))
+  private def transformRequest[C](f: HttpRequest[C] => HttpRequest[A]) = new HttpClient[C, B] {
+    def isDefinedAt(request: HttpRequest[C]) = self.isDefinedAt(f(request))
+    def apply(request: HttpRequest[C]) = self.apply(f(request))
+  }
+
+  private def transformResponse[C](f: HttpResponse[B] => HttpResponse[C]) = new HttpClient[A, C] {
+    def isDefinedAt(request: HttpRequest[A]) = self.isDefinedAt(request)
+    def apply(request: HttpRequest[A]) = self.apply(request) map f
   }
 }
 

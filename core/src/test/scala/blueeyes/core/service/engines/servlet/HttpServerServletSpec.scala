@@ -116,7 +116,7 @@ class HttpServerServletSpec extends Specification with BijectionsByteArray with 
       }
     }
     "return huge content"in{
-      client.get[ByteChunk]("/huge") must whenDelivered {
+      client.get("/huge") must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
             (status.code must be (OK)) and
@@ -125,7 +125,7 @@ class HttpServerServletSpec extends Specification with BijectionsByteArray with 
       }
     }
     "return huge delayed content"in{
-      val content = client.get[ByteChunk]("/huge/delayed")
+      val content = client.get("/huge/delayed")
       content must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
