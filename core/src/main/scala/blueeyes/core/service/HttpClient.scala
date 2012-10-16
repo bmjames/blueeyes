@@ -10,10 +10,10 @@ trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
 
   def get[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.GET, path)
 
-  def post[C, D](path: String)(content: C)(implicit encoder: C <~> A, decoder: B <~ D) =
-    method[C, D](HttpMethods.POST, path, Some(encoder.apply(content)))
+  def post[C, D](path: String)(content: C)(implicit encoder: C => A, decoder: B <~ D) =
+    method[C, D](HttpMethods.POST, path, Some(encoder(content)))
 
-  def put[C, D](path: String)(content: C)(implicit encoder: C <~> A, decoder: B <~ D) =
+  def put[C, D](path: String)(content: C)(implicit encoder: C => A, decoder: B <~ D) =
     method[B, D](HttpMethods.PUT, path, Some(encoder(content)))
 
   def delete[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.DELETE, path)
@@ -46,7 +46,7 @@ trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
   def parameters(parameters: (Symbol, String)*): HttpClient[A, B] =
     buildClient { request => request.copy(parameters = Map[Symbol, String](parameters: _*)) }
 
-  def content[C](content: C)(implicit encoder: C <~> A): HttpClient[C, B] =
+  def content[C](content: C)(implicit encoder: C => A): HttpClient[C, B] =
     buildClient { request => request.copy(content = Some(encoder(content))) }
 
   def cookies(cookies: (String, String)*): HttpClient[A, B] = buildClient { request =>
@@ -77,12 +77,12 @@ trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
 
   def queries(qs: (String, String)*): HttpClient[A, B] = buildClient { request => addQueries(request)(qs) }
 
-  def contentType[C](mimeType: MimeType)(implicit encoder: C <~> A): HttpClient[C, B] = new HttpClient[C, B] {
+  def contentType[C](mimeType: MimeType)(implicit encoder: C => A): HttpClient[C, B] = new HttpClient[C, B] {
     def isDefinedAt(request: HttpRequest[C]) =
-      self.isDefinedAt(request.copy(content = request.content.map(encoder.apply)))
+      self.isDefinedAt(request.copy(content = request.content.map(encoder)))
 
     def apply(request: HttpRequest[C]): Future[HttpResponse[B]] = self.apply {
-      request.copy(content = request.content.map(encoder.apply), headers = request.headers + Tuple2("Content-Type", mimeType.value))
+      request.copy(content = request.content.map(encoder), headers = request.headers + Tuple2("Content-Type", mimeType.value))
     }
   }
 
