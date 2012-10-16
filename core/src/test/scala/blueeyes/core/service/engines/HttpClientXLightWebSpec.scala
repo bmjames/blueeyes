@@ -68,7 +68,7 @@ with AkkaDefaults with HttpRequestMatchers {
 
   "HttpClientXLightWeb" should {
     "Support GET to invalid server should return http error" in {
-      val result = httpClient.get[String]("http://127.0.0.1:666/foo").failed
+      val result = httpClient.get("http://127.0.0.1:666/foo").failed
       result must whenDelivered {
         haveClass[HttpException]
       }
@@ -81,8 +81,8 @@ with AkkaDefaults with HttpRequestMatchers {
     }
 
     "Support GET requests with status OK" in {
-      httpClient.parameters('param1 -> "a").get(uri) must succeedWithContent {
-	(_ : String) => ok
+      httpClient.decode[String].parameters('param1 -> "a").get(uri) must succeedWithContent {
+        (_ : String) => ok
       }
     }
 
@@ -93,50 +93,50 @@ with AkkaDefaults with HttpRequestMatchers {
     }
 
     "Support GET requests with query params" in {
-      httpClient.get(uri + "?param1=a&param2=b") must succeedWithContent {
+      httpClient.decode[String].get(uri + "?param1=a&param2=b") must succeedWithContent {
         be_==/("param1=a&param2=b")
       }
     }
 
     "Support GET requests with request params" in {
-      httpClient.parameters('param1 -> "a", 'param2 -> "b").get(uri) must succeedWithContent {
+      httpClient.decode[String].parameters('param1 -> "a", 'param2 -> "b").get(uri) must succeedWithContent {
         be_==/("param1=a&param2=b")
       }
     }
 
     "Support POST requests with query params" in {
-      httpClient.translate[String].post(uri + "?param1=a&param2=b")("") must succeedWithContent {
+      httpClient.decode[String].post(uri + "?param1=a&param2=b")("") must succeedWithContent {
         be_==/("param1=a&param2=b")
       }
     }
 
     "Support POST requests with request params" in {
-      httpClient.translate[String].parameters('param1 -> "a", 'param2 -> "b").post(uri)("") must succeedWithContent {
+      httpClient.decode[String].parameters('param1 -> "a", 'param2 -> "b").post(uri)("") must succeedWithContent {
         be_==/("param1=a&param2=b")
       }
     }
 
     "Support POST requests with body" in {
       val expected = "Hello, world"
-      httpClient.translate[String].post(uri)(expected) must succeedWithContent (be_==(expected))
+      httpClient.decode[String].post(uri)(expected) must succeedWithContent (be_==(expected))
     }
 
     "Support POST requests with body and request params" in {
       val expected = "Hello, world"
-      httpClient.translate[String].parameters('param1 -> "a", 'param2 -> "b").post(uri)(expected) must succeedWithContent {
+      httpClient.decode[String].parameters('param1 -> "a", 'param2 -> "b").post(uri)(expected) must succeedWithContent {
         be_==/("param1=a&param2=b" + expected)
       }
     }
 
     "Support PUT requests with body" in {
       val expected = "Hello, world"
-      httpClient.translate[String].header(`Content-Length`(100)).put(uri)(expected) must succeedWithContent {
+      httpClient.decode[String].header(`Content-Length`(100)).put(uri)(expected) must succeedWithContent {
         be_==/(expected)
       }
     }
 
     "Support GET requests with header" in {
-      httpClient.header("Fooblahblah" -> "washere").header("param2" -> "1").get(uri + "?headers=true") must succeedWithContent {
+      httpClient.decode[String].header("Fooblahblah" -> "washere").header("param2" -> "1").get(uri + "?headers=true") must succeedWithContent {
         contain("Fooblahblah: washere") and contain("param2: 1")
       }
     }
@@ -154,7 +154,7 @@ with AkkaDefaults with HttpRequestMatchers {
 
     "Support POST requests with large payload" in {
       val expected = Array.fill(2048*1000)(0).toList.mkString("")
-      httpClient.translate[String].post(uri)(expected) must succeedWithContent {
+      httpClient.decode[String].post(uri)(expected) must succeedWithContent {
         be_==(expected)
       }
     }
@@ -208,7 +208,7 @@ with AkkaDefaults with HttpRequestMatchers {
     }
 
     "Support GET requests with query params" in {
-      httpClient.get[String](uri + "?param1=a&param2=b") must succeedWithContent {
+      httpClient.decode[String].get(uri + "?param1=a&param2=b") must succeedWithContent {
         be_==/("param1=a&param2=b")
       }
     }
@@ -217,7 +217,7 @@ with AkkaDefaults with HttpRequestMatchers {
       import BijectionsChunkByteArray._
       import BijectionsByteArray._
       val expected = "Hello, world"
-      httpClient.translate[Array[Byte]].post[Array[Byte]](uri)(StringToByteArray(expected)) must succeedWithContent {
+      httpClient.decode[Array[Byte]].post(uri)(StringToByteArray(expected)) must succeedWithContent {
         (content: Array[Byte]) => ByteArrayToString(content) must_== expected
       }
     }
@@ -230,7 +230,7 @@ with AkkaDefaults with HttpRequestMatchers {
 
       val chunks: Chunk[String] = Chunk("foo", Some(Future[Chunk[String]](Chunk("bar"))))
 
-      val futureResponse = httpClient.translate[Chunk[String]].post[Chunk[String]](uri)(chunks)
+      val futureResponse = httpClient.decode[Chunk[String]].post(uri)(chunks)
       val response = Await.result(futureResponse, duration)
       response.status.code must be(HttpStatusCodes.OK)
       readContent(response.content.get).map(_.mkString("")) must whenDelivered {
@@ -240,7 +240,7 @@ with AkkaDefaults with HttpRequestMatchers {
 
     "Support POST requests with encoded URL should be preserved" in {
       val content = "Hello, world"
-      httpClient.translate[String].post[String](uri + "?headers=true&plckForumId=Cat:Wedding%20BoardsForum:238")(content) must whenDelivered {
+      httpClient.decode[String].post(uri + "?headers=true&plckForumId=Cat:Wedding%20BoardsForum:238")(content) must whenDelivered {
         beLike {
           case HttpResponse(status, _, Some(content), _) =>
             (status.code must_== HttpStatusCodes.OK) and
@@ -253,7 +253,7 @@ with AkkaDefaults with HttpRequestMatchers {
       import BijectionsChunkByteArray._
       import BijectionsByteArray._
       val expected = "Hello, world"
-      httpClient.translate[String].post[Array[Byte]](uri)(StringToByteArray(expected)) must succeedWithContent {
+      httpClient.decode[String].post(uri)(StringToByteArray(expected)) must succeedWithContent {
         (content: String) => content must_== expected
       }
     }

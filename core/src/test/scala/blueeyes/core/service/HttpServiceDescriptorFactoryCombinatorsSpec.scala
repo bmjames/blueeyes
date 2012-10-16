@@ -81,7 +81,7 @@ class HttpServiceDescriptorFactoryCombinatorsSpec extends BlueEyesServiceSpecifi
     }
 
     "support health monitor statistics" in {
-      service.get[JValue]("/blueeyes/services/email/v1/health") must succeedWithContent { (content: JValue) =>
+      service.decode[JValue].get("/blueeyes/services/email/v1/health") must succeedWithContent { content: JValue =>
         (content \ "requests" \ "GET" \ "count" \ "eternity" mustEqual(JArray(JNum(1) :: Nil))) and
         (content \ "requests" \ "GET" \ "timing" mustNotEqual(JNothing)) and
         (content \ "requests" \ "GET" \ "timing" \ "perSecond" \ "eternity" mustNotEqual(JNothing)) and
@@ -93,7 +93,7 @@ class HttpServiceDescriptorFactoryCombinatorsSpec extends BlueEyesServiceSpecifi
 
     "add service locator" in {
       import BijectionsChunkString._
-      service.get[String]("/proxy") must succeedWithContent((_: String) must_== "it works!")
+      service.decode[String].get("/proxy") must succeedWithContent((_: String) must_== "it works!")
     }
 
     "RequestLogging: Creates logRequest" in{

@@ -20,16 +20,16 @@ class BlueEyesServiceSpecificationSpec extends BlueEyesServiceSpecification with
 
   "Service Specification" should {
     "support get by valid URL" in {
-      service.get[String]("/bar/id/bar.html") must whenDelivered { be_==(serviceResponse) }
+      service.decode[String].get("/bar/id/bar.html") must whenDelivered { be_==(serviceResponse) }
     }
 
     "support asynch get by valid URL" in {
-      val result = service.get[String]("/asynch/future") 
+      val result = service.decode[String].get("/asynch/future")
       result must whenDelivered { be_==(serviceResponse) }
     }
 
     "support eventually asynch get by valid URL" in {
-      service.get[String]("/asynch/eventually") must eventually { whenDelivered { be_==(serviceResponse) } }
+      service.decode[String].get("/asynch/eventually") must eventually { whenDelivered { be_==(serviceResponse) } }
     }
   }
 }
@@ -43,14 +43,14 @@ trait TestService extends BlueEyesServiceBuilder with BijectionsChunkString {
           get { request: HttpRequest[ByteChunk] =>
             Future(serviceResponse)
           }
-        }~
+        } ~
         path("/asynch/future") {
           get { request: HttpRequest[ByteChunk] =>
             async {
               serviceResponse
             }
           }
-        }~
+        } ~
         path("/asynch/eventually") {
           get { request: HttpRequest[ByteChunk] =>
             if (eventuallyCondition) {

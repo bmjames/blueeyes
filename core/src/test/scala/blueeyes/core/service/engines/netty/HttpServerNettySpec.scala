@@ -146,7 +146,7 @@ class HttpServerNettySpec extends Specification with BijectionsByteArray with Bi
       }
     }
     "return huge content"in{
-      client.get[ByteChunk]("/huge") must whenDelivered {
+      client.get("/huge") must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
             (status.code must be (OK)) and
@@ -155,7 +155,7 @@ class HttpServerNettySpec extends Specification with BijectionsByteArray with Bi
       }
     }
     "return huge delayed content"in{
-      val content = client.get[ByteChunk]("/huge/delayed")
+      val content = client.get("/huge/delayed")
       content must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
@@ -173,7 +173,7 @@ class HttpServerNettySpec extends Specification with BijectionsByteArray with Bi
       }
     }
     "return huge content by https"in{
-      sslClient.get[ByteChunk]("/huge") must whenDelivered {
+      sslClient.get("/huge") must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
             (status.code must be (OK)) and
