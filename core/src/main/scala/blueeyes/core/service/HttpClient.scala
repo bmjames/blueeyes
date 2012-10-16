@@ -8,25 +8,25 @@ import org.jboss.netty.handler.codec.http.CookieEncoder
 
 trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
 
-  def get[D](path: String)(implicit decoder: B <~> D) = method[A, D](HttpMethods.GET, path)
+  def get[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.GET, path)
 
-  def post[C, D](path: String)(content: C)(implicit encoder: C <~> A, decoder: B <~> D) =
+  def post[C, D](path: String)(content: C)(implicit encoder: C <~> A, decoder: B <~ D) =
     method[C, D](HttpMethods.POST, path, Some(encoder.apply(content)))
 
-  def put[C, D](path: String)(content: C)(implicit encoder: C <~> A, decoder: B <~> D) =
+  def put[C, D](path: String)(content: C)(implicit encoder: C <~> A, decoder: B <~ D) =
     method[B, D](HttpMethods.PUT, path, Some(encoder(content)))
 
-  def delete[D](path: String)(implicit decoder: B <~> D) = method[A, D](HttpMethods.DELETE, path)
+  def delete[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.DELETE, path)
 
-  def options[D](path: String)(implicit decoder: B <~> D) = method[A, D](HttpMethods.OPTIONS, path)
+  def options[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.OPTIONS, path)
 
-  def head[D](path: String)(implicit decoder: B <~> D) = method[A, D](HttpMethods.HEAD, path)
+  def head[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.HEAD, path)
 
-  def connect[D](path: String)(implicit decoder: B <~> D) = method[A, D](HttpMethods.CONNECT, path)
+  def connect[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.CONNECT, path)
 
-  def trace[D](path: String)(implicit decoder: B <~> D) = method[A, D](HttpMethods.TRACE, path)
+  def trace[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.TRACE, path)
 
-  def custom[D](custom: HttpMethod, path: String)(implicit decoder: B <~> D) = method[A, D](custom, path)
+  def custom[D](custom: HttpMethod, path: String)(implicit decoder: B <~ D) = method[A, D](custom, path)
 
   def protocol(protocol: String): HttpClient[A, B] =
     buildClient { request => request.withUriChanges(scheme = Some(protocol)) }
@@ -86,11 +86,11 @@ trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
     }
   }
 
-  def translate[D](implicit decoder: B <~> D): HttpClient[A, D] = new HttpClient[A, D] {
+  def translate[D](implicit decoder: B <~ D): HttpClient[A, D] = new HttpClient[A, D] {
     def isDefinedAt(request: HttpRequest[A]) = self.isDefinedAt(request)
 
     def apply(request: HttpRequest[A]): Future[HttpResponse[D]] = self.apply(request) map { response =>
-      val newC = response.content.map(decoder.apply)
+      val newC = response.content.map(decoder.unapply)
       response.copy(content = newC)
     }
   }
@@ -112,9 +112,9 @@ trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
     HttpRequest(request.method, URI(newUrl), request.parameters, request.headers, request.content, request.remoteHost, request.version)
   }
 
-  private def method[C, D](method: HttpMethod, path: String, content: Option[A] = None)(implicit decoder: B <~> D): Future[HttpResponse[D]] =
+  private def method[C, D](method: HttpMethod, path: String, content: Option[A] = None)(implicit decoder: B <~ D): Future[HttpResponse[D]] =
     self.apply(HttpRequest(method, path,  Map(),  Map(), content)) map { response =>
-      response.copy(content = response.content map decoder.apply)
+      response.copy(content = response.content map decoder.unapply)
     }
 
   private def buildClient[C](copy: HttpRequest[C] => HttpRequest[A]) = new HttpClient[C, B] {
