@@ -8,7 +8,7 @@ import org.jboss.netty.handler.codec.http.CookieEncoder
 
 trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
 
-  def get[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.GET, path)
+  def get[C](path: String)(implicit decoder: B <~ C) = method[A, C](HttpMethods.GET, path)
 
   def post[C, D](path: String)(content: C)(implicit encoder: C => A, decoder: B <~ D) =
     method[C, D](HttpMethods.POST, path, Some(encoder(content)))
@@ -16,17 +16,17 @@ trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
   def put[C, D](path: String)(content: C)(implicit encoder: C => A, decoder: B <~ D) =
     method[B, D](HttpMethods.PUT, path, Some(encoder(content)))
 
-  def delete[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.DELETE, path)
+  def delete[C](path: String)(implicit decoder: B <~ C) = method[A, C](HttpMethods.DELETE, path)
 
-  def options[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.OPTIONS, path)
+  def options[C](path: String)(implicit decoder: B <~ C) = method[A, C](HttpMethods.OPTIONS, path)
 
-  def head[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.HEAD, path)
+  def head[C](path: String)(implicit decoder: B <~ C) = method[A, C](HttpMethods.HEAD, path)
 
-  def connect[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.CONNECT, path)
+  def connect[C](path: String)(implicit decoder: B <~ C) = method[A, C](HttpMethods.CONNECT, path)
 
-  def trace[D](path: String)(implicit decoder: B <~ D) = method[A, D](HttpMethods.TRACE, path)
+  def trace[C](path: String)(implicit decoder: B <~ C) = method[A, C](HttpMethods.TRACE, path)
 
-  def custom[D](custom: HttpMethod, path: String)(implicit decoder: B <~ D) = method[A, D](custom, path)
+  def custom[C](custom: HttpMethod, path: String)(implicit decoder: B <~ C) = method[A, C](custom, path)
 
   def protocol(protocol: String): HttpClient[A, B] =
     buildClient { request => request.withUriChanges(scheme = Some(protocol)) }
@@ -86,10 +86,10 @@ trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
     }
   }
 
-  def translate[D](implicit decoder: B <~ D): HttpClient[A, D] = new HttpClient[A, D] {
+  def translate[C](implicit decoder: B <~ C): HttpClient[A, C] = new HttpClient[A, C] {
     def isDefinedAt(request: HttpRequest[A]) = self.isDefinedAt(request)
 
-    def apply(request: HttpRequest[A]): Future[HttpResponse[D]] = self.apply(request) map { response =>
+    def apply(request: HttpRequest[A]): Future[HttpResponse[C]] = self.apply(request) map { response =>
       val newC = response.content.map(decoder.unapply)
       response.copy(content = newC)
     }
