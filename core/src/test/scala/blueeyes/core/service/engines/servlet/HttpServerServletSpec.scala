@@ -70,11 +70,11 @@ class HttpServerServletSpec extends Specification with BijectionsByteArray with 
       }
     }
 
-    "read file"in{
+    "read file" in {
       TestEngineServiceContext.dataFile.delete
 
       akka.dispatch.Await.result(client.post("/file/write")("foo"), duration)
-      client.get("/file/read") must whenDelivered {
+      client.decode[String].get("/file/read") must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
             (status.code must be (OK)) and
@@ -83,8 +83,8 @@ class HttpServerServletSpec extends Specification with BijectionsByteArray with 
       }
     }
 
-    "return html by correct URI" in{
-      client.get("/bar/foo/adCode.html") must whenDelivered {
+    "return html by correct URI" in {
+      client.decode[String].get("/bar/foo/adCode.html") must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
             (status.code must be (OK)) and
@@ -106,8 +106,8 @@ class HttpServerServletSpec extends Specification with BijectionsByteArray with 
       response must beLike { case HttpException(failure, _) => failure must_== BadRequest }
     }
 
-    "return html by correct URI with parameters" in{
-      client.parameters('bar -> "zar").get("/foo") must whenDelivered {
+    "return html by correct URI with parameters" in {
+      client.decode[String].parameters('bar -> "zar").get("/foo") must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
             (status.code must be (OK)) and
@@ -115,7 +115,7 @@ class HttpServerServletSpec extends Specification with BijectionsByteArray with 
         }
       }
     }
-    "return huge content"in{
+    "return huge content" in {
       client.get("/huge") must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
