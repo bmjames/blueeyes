@@ -13,7 +13,6 @@ import akka.dispatch.Promise
 import akka.dispatch.Await
 import akka.util._
 
-import blueeyes.core.http.MimeTypes._
 import blueeyes.core.http._
 import blueeyes.core.data.{FileSink, FileSource, Chunk, ByteChunk, BijectionsByteArray, BijectionsChunkString}
 import blueeyes.core.http.combinators.HttpRequestCombinators
@@ -28,7 +27,6 @@ import org.streum.configrity.io.BlockFormat
 
 import blueeyes.concurrent.test.FutureMatchers
 import org.specs2.specification.{Step, Fragments}
-import org.specs2.time.TimeConversions._
 
 class HttpServerNettySpec extends Specification with BijectionsByteArray with BijectionsChunkString with blueeyes.bkka.AkkaDefaults with FutureMatchers {
 
@@ -100,11 +98,11 @@ class HttpServerNettySpec extends Specification with BijectionsByteArray with Bi
       }
     }
 
-    "read file"in{
+    "read file" in {
       TestEngineServiceContext.dataFile.delete
 
       akka.dispatch.Await.result(client.post("/file/write")("foo"), duration)
-      client.get("/file/read") must whenDelivered {
+      client.decode[String].get("/file/read") must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
             (status.code must be (OK)) and
@@ -113,8 +111,8 @@ class HttpServerNettySpec extends Specification with BijectionsByteArray with Bi
       }
     }
 
-    "return html by correct URI" in{
-      client.get("/bar/foo/adCode.html") must whenDelivered {
+    "return html by correct URI" in {
+      client.decode[String].get("/bar/foo/adCode.html") must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
             (status.code must be (OK)) and
@@ -136,8 +134,8 @@ class HttpServerNettySpec extends Specification with BijectionsByteArray with Bi
       response must beLike { case HttpException(failure, _) => failure must_== BadRequest }
     }
 
-    "return html by correct URI with parameters" in{
-      client.parameters('bar -> "zar").get("/foo") must whenDelivered {
+    "return html by correct URI with parameters" in {
+      client.decode[String].parameters('bar -> "zar").get("/foo") must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
             (status.code must be (OK)) and
@@ -164,8 +162,8 @@ class HttpServerNettySpec extends Specification with BijectionsByteArray with Bi
         }
       }
     }
-    "return html by correct URI by https" in{
-      sslClient.get("/bar/foo/adCode.html") must whenDelivered {
+    "return html by correct URI by https" in {
+      sslClient.decode[String].get("/bar/foo/adCode.html") must whenDelivered {
         beLike {
           case HttpResponse(status, _, content, _) =>
             content.get mustEqual(TestEngineServiceContext.context)
