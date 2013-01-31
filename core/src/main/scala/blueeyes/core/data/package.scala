@@ -6,6 +6,4 @@ package object data{
 
   type <~>[A, B] = Bijection[A, B]
 
-  type <~ [A, B] = Unapply[B, A]
-
 }
