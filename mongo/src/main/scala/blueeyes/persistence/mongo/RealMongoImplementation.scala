@@ -14,6 +14,7 @@ import org.streum.configrity.Configuration
 import scala.collection.JavaConversions._
 
 import akka.actor.Actor
+import akka.actor.ActorRef
 import akka.actor.ActorSystem
 import akka.actor.ActorKilledException
 import akka.actor.Props
@@ -26,7 +27,7 @@ import akka.routing.RoundRobinRouter
 import akka.util.Duration
 import akka.util.Timeout
 
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 import scalaz.Scalaz._
 import scalaz._
 import com.weiglewilczek.slf4s.Logging
@@ -53,21 +54,47 @@ object RealMongo {
 
       if (config[Boolean]("slaveOk", true)) { underlying.setReadPreference(ReadPreference.SECONDARY) } else { underlying.setReadPreference(ReadPreference.PRIMARY) }
 
+
       underlying
     }
 
     val disconnectTimeout = config.get[Long]("disconnect_timeout").getOrElse(300000L)
+    val writeConcern      = {
+      val concernConfig = config.detach("writeConcern")
+      if (!concernConfig.data.isEmpty){
+        Some(new WriteConcern(concernConfig[Int]("w", 1), concernConfig[Int]("wtimeout", 0), concernConfig("fsync", false),
+          concernConfig[Boolean]("j", false), concernConfig[Boolean]("continueOnInsertError", false)))
+      }
+      else None
+    }
 
-    new RealMongo(mongo, disconnectTimeout)
+    new RealMongo(mongo, disconnectTimeout, writeConcern)
   }
 }
 
-class RealMongo(mongo: com.mongodb.Mongo, disconnectTimeout: Timeout) extends Mongo with AkkaDefaults {
-  def database(databaseName: String) = new RealDatabase(defaultActorSystem, this, mongo.getDB(databaseName), disconnectTimeout)
+class RealMongo(mongo: com.mongodb.Mongo, disconnectTimeout: Timeout, writeConcern: Option[WriteConcern]) extends Mongo with AkkaDefaults {
+  def database(databaseName: String) = new RealDatabase(defaultActorSystem, this, mongo.getDB(databaseName), disconnectTimeout, 10, writeConcern)
   lazy val close = Future(mongo.close)
 }
 
 object RealDatabase {
+
+  def router(actorSystem: ActorSystem, databaseName: String, poolSize: Int): ActorRef = {
+    Option(routers get (actorSystem, databaseName)) getOrElse {
+      routers synchronized {
+        val router =
+          actorSystem.actorOf(
+            Props[RealMongoActor] withRouter (RoundRobinRouter(nrOfInstances = poolSize)),
+            "blueeyes_mongo_router-" + databaseName
+          )
+        routers.put((actorSystem, databaseName), router)
+        router
+      }
+    }
+  }
+
+  private val routers = new ConcurrentHashMap[(ActorSystem, String), ActorRef]()
+
   private class RealMongoActor extends Actor {
     def receive = {
       case MongoQueryTask(query, collection, isVerified) =>
@@ -81,16 +108,18 @@ object RealDatabase {
   }
 }
 
-private[mongo] class RealDatabase(actorSystem: ActorSystem, val mongo: Mongo, val database: DB, disconnectTimeout: Timeout, poolSize: Int = 10) extends Database with Logging {
+private[mongo] class RealDatabase(actorSystem: ActorSystem, val mongo: Mongo, val database: DB, disconnectTimeout: Timeout, poolSize: Int = 10, writeConcern: Option[WriteConcern] = None) extends Database with Logging {
   import RealDatabase._
 
   private implicit val dispatcher: MessageDispatcher = actorSystem.dispatchers.lookup("blueeyes_mongo-" + database.getName)
 
-  private lazy val mongoActor = {
-    actorSystem.actorOf(Props[RealMongoActor].withRouter(RoundRobinRouter(nrOfInstances = poolSize)), "blueeyes_mongo_router-" + database.getName)
-  }
+  private lazy val mongoActor = RealDatabase.router(actorSystem, database.getName, poolSize)
 
-  protected def collection(collectionName: String) = new RealDatabaseCollection(database.getCollection(collectionName), this)
+  protected def collection(collectionName: String) = {
+    val collection = database.getCollection(collectionName)
+    collection.setWriteConcern(writeConcern.orNull)
+    new RealDatabaseCollection(collection, this)
+  }
 
   def collections = database.getCollectionNames.map(collection).map(mc => MongoCollectionHolder(mc, mc.collection.getName, this)).toSet
 
@@ -114,15 +143,15 @@ private[mongo] class RealDatabaseCollection(val collection: DBCollection, databa
 
   def aggregation(pipeline : JArray, output : Option[String] = None): Option[JObject] = {
     // Set up the command object (Java driver doesn't yet provide an interface for this)
-    val cmd = JObject(List(JField("aggregate", JString(collection.getName)), 
+    val cmd = JObject(List(JField("aggregate", JString(collection.getName)),
                            JField("pipeline", pipeline)))
 
-    MongoToJson.unapply(cmd).flatMap { 
+    MongoToJson.unapply(cmd).flatMap {
       obj: DBObject => MongoToJson(database.database.command(obj))
     }.toOption
   }
 
-  def insert(objects: List[JObject]) = { 
+  def insert(objects: List[JObject]) = {
     objects.map(MongoToJson.unapply(_)).sequence[V, DBObject].map{objects: List[DBObject] =>
       collection.insert(objects)
     }
