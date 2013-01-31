@@ -44,7 +44,7 @@ trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
   def parameters(parameters: (Symbol, String)*): HttpClient[A, B] =
     transformRequest { request => request.copy(parameters = Map[Symbol, String](parameters: _*)) }
 
-  def content[C](content: C)(implicit encoder: C => A): HttpClient[C, B] =
+  def content[C](content: C)(implicit encoder: C <~> A): HttpClient[C, B] =
     transformRequest { request => request.copy(content = Some(encoder(content))) }
 
   def cookies(cookies: (String, String)*): HttpClient[A, B] = transformRequest { request =>
@@ -76,11 +76,11 @@ trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
   def contentType(mimeType: MimeType): HttpClient[A, B] =
     transformRequest { request => request.copy(headers = request.headers + Tuple2("Content-Type", mimeType.value)) }
 
-  def encode[C](implicit encoder: C => A): HttpClient[C, B] =
+  def encode[C](implicit encoder: C <~> A): HttpClient[C, B] =
     transformRequest { request => request.copy(content = request.content map encoder)}
 
-  def decode[C](implicit decoder: B <~ C): HttpClient[A, C] =
-    transformResponse { response => response.copy(content = response.content map decoder.unapply) }
+  def decode[C](implicit decoder: B <~> C): HttpClient[A, C] =
+    transformResponse { response => response.copy(content = response.content map decoder.apply) }
 
   private def addQueries(request: HttpRequest[A])(queries: Iterable[(String, String)]): HttpRequest[A] = {
     import java.net.URLEncoder
