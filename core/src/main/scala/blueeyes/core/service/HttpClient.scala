@@ -5,7 +5,6 @@ import blueeyes.core.http._
 import blueeyes.core.data._
 import java.net.InetAddress
 import org.jboss.netty.handler.codec.http.CookieEncoder
-import blueeyes.json.JsonAST.JValue
 
 trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
 
