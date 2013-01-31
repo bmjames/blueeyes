@@ -81,7 +81,7 @@ with AkkaDefaults with HttpRequestMatchers {
     }
 
     "Support GET requests with status OK" in {
-      httpClient.decode[String].parameters('param1 -> "a").get(uri) must succeedWithContent {
+      httpClient.parameters('param1 -> "a").decode[String].get(uri) must succeedWithContent {
         (_ : String) => ok
       }
     }
@@ -136,7 +136,7 @@ with AkkaDefaults with HttpRequestMatchers {
     }
 
     "Support GET requests with header" in {
-      httpClient.decode[String].header("Fooblahblah" -> "washere").header("param2" -> "1").get(uri + "?headers=true") must succeedWithContent {
+      httpClient.header("Fooblahblah" -> "washere").header("param2" -> "1").decode[String].get(uri + "?headers=true") must succeedWithContent {
         contain("Fooblahblah: washere") and contain("param2: 1")
       }
     }

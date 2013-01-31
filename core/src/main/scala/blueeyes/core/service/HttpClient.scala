@@ -5,14 +5,17 @@ import blueeyes.core.http._
 import blueeyes.core.data._
 import java.net.InetAddress
 import org.jboss.netty.handler.codec.http.CookieEncoder
+import blueeyes.json.JsonAST.JValue
 
 trait HttpClient[A, B] extends HttpClientHandler[A, B] { self =>
 
   def get(path: String) = method(HttpMethods.GET, path)
 
-  def post(path: String)(content: A) = method(HttpMethods.POST, path, Some(content))
+  def post[C](path: String)(content: C)(implicit encoder: C <~> A): Future[HttpResponse[B]] =
+    encode[C].method(HttpMethods.POST, path, Some(content))
 
-  def put(path: String)(content: A) = method(HttpMethods.PUT, path, Some(content))
+  def put[C](path: String)(content: C)(implicit encoder: C <~> A): Future[HttpResponse[B]] =
+    encode[C].method(HttpMethods.PUT, path, Some(content))
 
   def delete(path: String) = method(HttpMethods.DELETE, path)
 
